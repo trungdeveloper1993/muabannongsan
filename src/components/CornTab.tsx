@@ -178,9 +178,10 @@ export default function CornTab({ onSaveRecord }: CornTabProps) {
   };
 
   return (
-    <div className="space-y-6 pb-20 animate-fade-in">
-      {/* Group form nhập liệu tiêu chuẩn iOS 16 */}
-      <div className="space-y-4">
+    <div className="animate-fade-in pb-12">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start">
+        {/* CỘT TRÁI: FORM NHẬP SỐ LIỆU */}
+        <div className="lg:col-span-5 space-y-4">
         <div className="flex items-center justify-between px-1">
           <h3 className="font-bold text-lg text-[#007AFF] flex items-center gap-2">
             <span className="w-2 h-6 bg-[#007AFF] rounded-full"></span>
@@ -327,7 +328,8 @@ export default function CornTab({ onSaveRecord }: CornTabProps) {
         </div>
       </div>
 
-      {/* CHỈ TIÊU KẾT QUẢ ĐỒNG HỒ TÍNH TOÁN */}
+        {/* CỘT PHẢI: KẾT QUẢ VÀ CHI TIẾT */}
+        <div className="lg:col-span-7 space-y-6">
       <div className="grid grid-cols-2 gap-3.5">
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-zinc-150/80 text-center space-y-1">
           <span className="text-[11px] font-bold text-[#8E8E93] uppercase tracking-wider">Đơn Giá Thực Tế</span>
@@ -410,5 +412,7 @@ export default function CornTab({ onSaveRecord }: CornTabProps) {
         </div>
       </div>
     </div>
+  </div>
+</div>
   );
 }

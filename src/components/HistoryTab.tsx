@@ -71,7 +71,10 @@ export default function HistoryTab({ records, onClearRecords, onDeleteRecord }: 
   };
 
   return (
-    <div className="space-y-6 pb-20 animate-fade-in">
+    <div className="animate-fade-in pb-12">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start">
+        {/* CỘT TRÁI: KIỂM SOÁT & THỐNG KÊ */}
+        <div className="lg:col-span-5 space-y-5">
       
       {/* 1. KHỐI SUMMARY STATS THỐNG KÊ GIAO DỊCH */}
       <div className="space-y-3">
@@ -157,8 +160,10 @@ export default function HistoryTab({ records, onClearRecords, onDeleteRecord }: 
           })}
         </div>
       </div>
+    </div>
 
-      {/* 3. DANH SÁCH CHI TIẾT NHẬT KÝ */}
+        {/* CỘT PHẢI: CHI TIẾT NHẬT KÝ CHI TRẢ */}
+        <div className="lg:col-span-7 space-y-4">
       <div className="space-y-3">
         <div className="flex items-center justify-between px-1">
           <h2 className="text-[#3C3C43] text-xs font-bold uppercase tracking-wider">Danh Sách Giao Dịch ({filteredRecords.length})</h2>
@@ -350,5 +355,7 @@ export default function HistoryTab({ records, onClearRecords, onDeleteRecord }: 
       )}
 
     </div>
+  </div>
+</div>
   );
 }

@@ -17,6 +17,20 @@ import CornTab from './components/CornTab';
 import HistoryTab from './components/HistoryTab';
 import { TransactionRecord, ProductType } from './types';
 
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { 
+  ClipboardList, Egg, Coffee, Star, ShoppingBag, Info, 
+  ChevronRight, Compass, ShieldCheck 
+} from 'lucide-react';
+
+import PepperTab from './components/PepperTab';
+import CoffeeTab from './components/CoffeeTab';
+import CornTab from './components/CornTab';
+import HistoryTab from './components/HistoryTab';
+import { TransactionRecord, ProductType } from './types';
+import { formatCurrency } from './utils/exporter';
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<string>('tiêu');
   const [records, setRecords] = useState<TransactionRecord[]>([]);
@@ -63,18 +77,18 @@ export default function App() {
             weight: 1500,
             moisture: 13.0,
             basePrice: 150000,
-            finalPrice: 151500, // +1.5% - (Rem=5.0 chuẩn, độ ẩm 13% được cộng 1.0%? Đợi nha: (15-13)*0.5 = +1% độ ẩm. Rem 5.0 -> +0%. Tổng +1.0% = 151500)
-            totalAmount: 227250000,
+            finalPrice: 152000, // Độ ẩm 13% được cộng 2.0% ẩm bonus theo quy tắc: 15 - 13 = 2%?
+            totalAmount: 228000000,
             details: {
               rem: 5.0,
-              moistureBonusPercent: 1.0,
+              moistureBonusPercent: 2.0,
               remBonusPercent: 0,
-              totalAdjustmentPercent: 1.0,
+              totalAdjustmentPercent: 2.0,
               formulaSteps: [
                 { title: '1. Giá thành nguyên giá', expression: '150.000 đ', result: '150.000 đ', type: 'info' },
-                { title: '2. Tỷ lệ điều chỉnh độ ẩm', expression: '1.0%', result: '+1.00%', type: 'positive', note: 'Ẩm 13.0% < 15.0%, được thưởng' },
+                { title: '2. Tỷ lệ điều chỉnh độ ẩm', expression: '2.0%', result: '+2.00%', type: 'positive', note: 'Ẩm 13.0% < 15.0%, được thưởng' },
                 { title: '3. Tỷ lệ chất lượng (Rem)', expression: '5.0', result: '+0.00%', type: 'neutral', note: 'Đạt mốc chuẩn 5' },
-                { title: '4. Đơn giá cuối cùng', expression: 'Giá chốt', result: '151.500 đ', type: 'info' }
+                { title: '4. Đơn giá cuối cùng', expression: 'Giá chốt', result: '152.000 đ', type: 'info' }
               ]
             }
           },
@@ -145,51 +159,186 @@ export default function App() {
     saveRecordsToStorage(filtered);
   };
 
-  return (
-    <div className="min-h-screen bg-[#F2F2F7] flex flex-col items-center justify-start text-zinc-900 overflow-x-hidden font-sans">
-      
-      {/* KHUNG SIMULATOR ĐIỆN THOẠI TRÊN MÁY TÍNH & FULL MÀN HÌNH TRÊN ĐIỆN THOẠI */}
-      <div className="w-full max-w-lg bg-[#F2F2F7] md:my-6 md:rounded-[40px] md:shadow-2xl md:border-8 md:border-zinc-900 border-black overflow-hidden flex flex-col relative shrink-0 min-h-screen md:min-h-[850px]">
-        
-        {/* iOS Native Status Bar */}
-        <div className="bg-[#F2F2F7]/95 backdrop-blur-md sticky top-0 z-50">
-          <StatusBar />
-        </div>
+  // Tính thống kê tổng hôm nay
+  const totalWeight = records.reduce((sum, r) => sum + r.weight, 0);
+  const totalAmount = records.reduce((sum, r) => sum + r.totalAmount, 0);
+  const transactionCount = records.length;
 
-        {/* THẺ TIÊU ĐỀ NATIVE HEADER */}
-        <div className="px-6 pt-4 pb-2.5 flex flex-col justify-start select-none bg-[#F2F2F7]">
-          <div className="flex justify-between items-end">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight text-[#1C1C1E]">Nông Sản Pro</h1>
-              <p className="text-[#8E8E93] text-xs font-semibold tracking-wide capitalize mt-0.5">{dateStr}</p>
+  return (
+    <div className="min-h-screen bg-[#F4F5F7] text-zinc-900 font-sans antialiased flex flex-col">
+      
+      {/* WEB HEADER CHUẨN ĐẸP VÀ CHUYÊN NGHIỆP */}
+      <header className="bg-white border-b border-zinc-200/85 sticky top-0 z-50 shadow-xs">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16 sm:h-20 gap-4">
+            
+            {/* Logo Brand */}
+            <div className="flex items-center space-x-2.5">
+              <div className="w-10 h-10 rounded-xl bg-[#007AFF] flex items-center justify-center text-white text-xl shadow-md shadow-blue-200">
+                🌾
+              </div>
+              <div>
+                <span className="text-base sm:text-lg font-black text-zinc-900 tracking-tight block leading-tight">
+                  Nông Sản Pro
+                </span>
+                <span className="text-[10px] font-semibold text-[#8E8E93] tracking-wider uppercase block mt-0.5">
+                  Thương Lượng & Giao Dịch
+                </span>
+              </div>
             </div>
-            <div className="flex items-center space-x-1.5">
+
+            {/* Desktop Tabs Switcher */}
+            <div className="hidden md:flex items-center space-x-1.5 bg-[#F2F2F7] p-1 rounded-xl">
+              {(['tiêu', 'cà phê', 'bắp', 'nhật ký'] as const).map((tab) => {
+                const isActive = activeTab === tab;
+                const IconComponent = tab === 'tiêu' ? Compass : tab === 'cà phê' ? Coffee : tab === 'bắp' ? ShoppingBag : ClipboardList;
+                const label = tab === 'tiêu' ? 'Hạt Tiêu' : tab === 'cà phê' ? 'Cà Phê' : tab === 'bắp' ? 'Bắp Tươi' : 'Nhật Ký Giao Dịch';
+                return (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setActiveTab(tab)}
+                    className={`flex items-center space-x-1.5 px-4 py-2 rounded-lg font-bold text-xs cursor-pointer transition-all duration-150 ${
+                      isActive 
+                        ? 'bg-white text-[#007AFF] shadow-xs' 
+                        : 'text-[#8E8E93] hover:text-zinc-700'
+                    }`}
+                  >
+                    <IconComponent className="w-4 h-4" />
+                    <span>{label}</span>
+                    {tab === 'nhật ký' && records.length > 0 && (
+                      <span className="bg-[#FF3B30] text-white text-[9px] px-1.5 py-0.5 rounded-full font-black ml-1 animate-pulse">
+                        {records.length}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Right details & action button */}
+            <div className="flex items-center space-x-3">
+              <div className="hidden lg:flex flex-col text-right">
+                <span className="text-xs font-bold text-zinc-800 capitalize leading-none mb-1">{dateStr}</span>
+                <span className="text-[10px] font-medium text-zinc-400">Giao diện đa thiết bị</span>
+              </div>
               <button 
                 type="button"
                 onClick={handleTriggerSync}
                 id="btn-icloud-sync"
-                className={`px-3.5 py-1.5 rounded-full shadow-xs font-bold text-[11px] uppercase tracking-wider flex items-center space-x-1.5 border border-zinc-200/50 cursor-pointer active:scale-95 transition-all duration-200 ${
+                className={`px-3 py-1.5 rounded-xl shadow-xs font-bold text-xs uppercase flex items-center space-x-1.5 border border-zinc-200/50 cursor-pointer active:scale-95 transition-all duration-200 shrink-0 ${
                   isSyncing 
                     ? 'bg-blue-50 text-blue-600 border-blue-200' 
-                    : 'bg-white text-[#007AFF] hover:bg-zinc-50'
+                    : 'bg-[#F2F2F7] text-[#007AFF] hover:bg-zinc-200'
                 }`}
               >
                 <div className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-blue-500 animate-ping' : 'bg-green-500 animate-pulse'}`}></div>
-                <span className="italic">{isSyncing ? syncMessage : 'iCloud Sync'}</span>
+                <span className="font-sans text-[10px] sm:text-[11px] tracking-wider">{isSyncing ? 'iCloud Syncing' : 'iCloud Sync'}</span>
               </button>
             </div>
+
           </div>
         </div>
+      </header>
+
+      {/* MOBILE HEADER TAB NAVIGATION ROW (Sticky below Header on smaller screens) */}
+      <div className="md:hidden bg-white border-b border-zinc-200 py-2.5 px-4 sticky top-16 z-40 shadow-xs flex items-center justify-between gap-1 overflow-x-auto scrollbar-none">
+        {(['tiêu', 'cà phê', 'bắp', 'nhật ký'] as const).map((tab) => {
+          const isActive = activeTab === tab;
+          const IconComponent = tab === 'tiêu' ? Compass : tab === 'cà phê' ? Coffee : tab === 'bắp' ? ShoppingBag : ClipboardList;
+          const label = tab === 'tiêu' ? 'Tiêu' : tab === 'cà phê' ? 'Cà Phê' : tab === 'bắp' ? 'Bắp' : 'Nhật Ký';
+          return (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab)}
+              className={`flex-1 flex items-center justify-center space-x-1 py-2 px-1 rounded-xl text-xs font-bold transition-all shrink-0 relative ${
+                isActive 
+                  ? 'bg-blue-50 text-[#007AFF]' 
+                  : 'text-zinc-500 active:bg-zinc-100'
+              }`}
+            >
+              <IconComponent className="w-3.5 h-3.5" />
+              <span>{label}</span>
+              {tab === 'nhật ký' && records.length > 0 && (
+                <span className="absolute -top-1 right-0 sm:right-1 bg-[#FF3B30] text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center font-black">
+                  {records.length}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* NỘI DUNG CHÍNH WEBSITE */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8">
+        
+        {/* DASHBOARD SUMMARY ROW */}
+        <section id="site-dashboard-stats" className="bg-white rounded-3xl p-5 sm:p-6 border border-zinc-200/80 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-4 border-b border-zinc-100">
+            <div>
+              <h2 className="text-base sm:text-lg font-black text-zinc-900 tracking-tight flex items-center gap-2">
+                <span className="w-2.5 h-5 bg-emerald-500 rounded-sm"></span>
+                Tổng Hợp Giao Dịch Hôm Nay
+              </h2>
+              <p className="text-zinc-400 text-[11px] font-semibold mt-0.5">Bản chiết tính cộng dồn từ tất cả các mẻ hàng đã thỏa thuận</p>
+            </div>
+            <div className="text-xs bg-zinc-100 text-zinc-650 px-3.5 py-1.5 rounded-full font-bold self-start sm:self-auto capitalize font-sans">
+              🕒 {dateStr}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 sm:pt-5">
+            
+            {/* Stat Card 1 */}
+            <div className="bg-[#F8F9FA] rounded-2xl p-4 flex items-center space-x-4 border border-zinc-100 transition-all hover:bg-zinc-50 hover:border-zinc-200">
+              <div className="w-11 h-11 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center text-xl font-bold">
+                🚚
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Số Mẻ Đã Thỏa Thuận</span>
+                <span className="text-lg sm:text-xl font-black text-zinc-800">{transactionCount} mẻ giao dịch</span>
+              </div>
+            </div>
+
+            {/* Stat Card 2 */}
+            <div className="bg-[#F8F9FA] rounded-2xl p-4 flex items-center space-x-4 border border-zinc-100 transition-all hover:bg-zinc-50 hover:border-zinc-200">
+              <div className="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl font-bold">
+                ⚖️
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Tổng Trọng Lượng Thu</span>
+                <span className="text-lg sm:text-xl font-black text-[#007AFF]">
+                  {totalWeight.toLocaleString('vi-VN')} <span className="text-xs font-semibold">kg</span>
+                </span>
+              </div>
+            </div>
+
+            {/* Stat Card 3 */}
+            <div className="bg-[#EBFDF3] rounded-2xl p-4 flex items-center space-x-4 border border-emerald-100 transition-all hover:bg-white hover:border-emerald-200">
+              <div className="w-11 h-11 rounded-xl bg-emerald-500 text-white flex items-center justify-center text-xl font-bold shadow-xs">
+                💵
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[11px] font-bold text-emerald-800/70 uppercase tracking-wider">Tổng Doanh Số Dự Chi</span>
+                <span className="text-lg sm:text-xl font-black text-emerald-600">
+                  {formatCurrency(Math.round(totalAmount))}
+                </span>
+              </div>
+            </div>
+
+          </div>
+        </section>
 
         {/* CONTAINER CHỨA NỘI DUNG FORM TÍNH TOÁN */}
-        <main className="flex-1 px-5 overflow-y-auto scrollbar-thin">
+        <section className="bg-transparent">
           <AnimatePresence mode="wait">
             {activeTab === 'tiêu' && (
               <motion.div
                 key="tiêu"
-                initial={{ opacity: 0, x: -15 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 15 }}
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -15 }}
                 transition={{ duration: 0.18 }}
               >
                 <PepperTab onSaveRecord={handleSaveRecord} />
@@ -199,9 +348,9 @@ export default function App() {
             {activeTab === 'cà phê' && (
               <motion.div
                 key="cà phê"
-                initial={{ opacity: 0, x: -15 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 15 }}
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -15 }}
                 transition={{ duration: 0.18 }}
               >
                 <CoffeeTab onSaveRecord={handleSaveRecord} />
@@ -211,9 +360,9 @@ export default function App() {
             {activeTab === 'bắp' && (
               <motion.div
                 key="bắp"
-                initial={{ opacity: 0, x: -15 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 15 }}
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -15 }}
                 transition={{ duration: 0.18 }}
               >
                 <CornTab onSaveRecord={handleSaveRecord} />
@@ -223,9 +372,9 @@ export default function App() {
             {activeTab === 'nhật ký' && (
               <motion.div
                 key="nhật ký"
-                initial={{ opacity: 0, x: -15 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 15 }}
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -15 }}
                 transition={{ duration: 0.18 }}
               >
                 <HistoryTab 
@@ -236,67 +385,14 @@ export default function App() {
               </motion.div>
             )}
           </AnimatePresence>
-        </main>
+        </section>
+      </main>
 
-        {/* BẢN TIN BÁO NÚT BOTTOM TAB BAR CHUẨN IOS 16 */}
-        <nav id="ios-bottom-tab-bar" className="sticky bottom-0 w-full bg-[#F9F9FB]/95 backdrop-blur-xl border-t border-zinc-200 py-2.5 px-4 flex justify-around items-center select-none z-40">
-          {/* TAB TIÊU */}
-          <button
-            type="button"
-            onClick={() => setActiveTab('tiêu')}
-            className={`flex flex-col items-center space-y-1 cursor-pointer transition-colors ${
-              activeTab === 'tiêu' ? 'text-[#007AFF]' : 'text-[#8E8E93]'
-            }`}
-          >
-            <Compass className="w-5.5 h-5.5" strokeWidth={activeTab === 'tiêu' ? 2.5 : 2} />
-            <span className="text-[10px] font-bold">Hạt Tiêu</span>
-          </button>
-
-          {/* TAB CÀ PHÊ */}
-          <button
-            type="button"
-            onClick={() => setActiveTab('cà phê')}
-            className={`flex flex-col items-center space-y-1 cursor-pointer transition-colors ${
-              activeTab === 'cà phê' ? 'text-[#007AFF]' : 'text-[#8E8E93]'
-            }`}
-          >
-            <Coffee className="w-5.5 h-5.5" strokeWidth={activeTab === 'cà phê' ? 2.5 : 2} />
-            <span className="text-[10px] font-bold">Cà Phê</span>
-          </button>
-
-          {/* TAB BẮP TƯƠI */}
-          <button
-            type="button"
-            onClick={() => setActiveTab('bắp')}
-            className={`flex flex-col items-center space-y-1 cursor-pointer transition-colors ${
-              activeTab === 'bắp' ? 'text-[#007AFF]' : 'text-[#8E8E93]'
-            }`}
-          >
-            <ShoppingBag className="w-5.5 h-5.5" strokeWidth={activeTab === 'bắp' ? 2.5 : 2} />
-            <span className="text-[10px] font-bold">Bắp Tươi</span>
-          </button>
-
-          {/* TAB NHẬT KÝ */}
-          <button
-            type="button"
-            onClick={() => setActiveTab('nhật ký')}
-            className={`flex flex-col items-center space-y-1 cursor-pointer transition-colors relative ${
-              activeTab === 'nhật ký' ? 'text-[#007AFF]' : 'text-[#8E8E93]'
-            }`}
-          >
-            <ClipboardList className="w-5.5 h-5.5" strokeWidth={activeTab === 'nhật ký' ? 2.5 : 2} />
-            <span className="text-[10px] font-bold">Nhật Ký</span>
-            
-            {/* Huy hiệu số lượng mẻ ngày hôm nay */}
-            {records.length > 0 && (
-              <span className="absolute -top-1.5 -right-2 bg-[#FF3B30] text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center border border-white animate-scale-up">
-                {records.length}
-              </span>
-            )}
-          </button>
-        </nav>
-
-      </div>
+      {/* WEB FOOTER */}
+      <footer className="bg-white border-t border-zinc-200/85 py-6 mt-12 text-center text-xs text-zinc-400 font-medium">
+        <p>© 2026 Hỗ Trợ Mua Bán Nông Sản Pro - Hệ thống hạch toán giá trị cho tiêu, cà phê & bắp sạch.</p>
+        <p className="mt-1 font-sans text-[11px] text-zinc-350">Thiết kế hoàn hảo, tự động tương thích kích thước màn hình tất cả máy tính & di động.</p>
+      </footer>
     </div>
   );
 }
