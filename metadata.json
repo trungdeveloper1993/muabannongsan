@@ -1,0 +1,6 @@
+{
+  "name": "Hỗ trợ mua bán nông sản",
+  "description": "Ứng dụng hỗ trợ tính toán giá cả, lưu trữ nhật ký mua bán nông sản (Tiêu, Cà Phê, Bắp Tươi) với giao diện iOS 16 mượt mà.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
