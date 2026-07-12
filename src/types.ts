@@ -16,7 +16,7 @@ export interface PepperInput extends BaseInput {
 }
 
 export interface CoffeeInput extends BaseInput {
-  blackBroken: number; // Đen vỡ (%)
+  blackBroken?: number; // Đen vỡ (%)
   impurity: number;    // Tạp chất (%)
 }
 

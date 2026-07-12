@@ -14,12 +14,24 @@ interface PepperTabProps {
 
 export default function PepperTab({ onSaveRecord }: PepperTabProps) {
   // Trạng thái các input của Tiêu
-  const [inputs, setInputs] = useState<PepperInput>({
-    weight: 2500, // Số Kg mẫu
-    moisture: 12.5, // Độ ẩm mẫu
-    rem: 5.4,     // Rem mẫu
-    basePrice: 155000, // Giá thành mẫu
+  const [inputs, setInputs] = useState(() => {
+    const savedPrice = localStorage.getItem('pepper_base_price');
+    return {
+      basePrice: savedPrice ? parseInt(savedPrice, 10) : 155000, // Giá thành mẫu
+    };
   });
+
+  // Hỗ trợ gõ số thập phân hoàn hảo không giật lag
+  const [weightStr, setWeightStr] = useState<string>('2500');
+  const [moistureStr, setMoistureStr] = useState<string>('12.5');
+  const [remStr, setRemStr] = useState<string>('5.4');
+
+  // Lưu Giá Sàn tự động bất cứ khi nào nó thay đổi để không bị mất khi thoát
+  useEffect(() => {
+    if (inputs.basePrice > 0) {
+      localStorage.setItem('pepper_base_price', inputs.basePrice.toString());
+    }
+  }, [inputs.basePrice]);
 
   const [calcSteps, setCalcSteps] = useState<CalculationDetail[]>([]);
   const [finalPrice, setFinalPrice] = useState<number>(0);
@@ -50,7 +62,10 @@ export default function PepperTab({ onSaveRecord }: PepperTabProps) {
 
   // Thực hiện tính toán khi giá trị thay đổi
   useEffect(() => {
-    const { weight, moisture, rem, basePrice } = inputs;
+    const weight = parseFloat(weightStr) || 0;
+    const moisture = parseFloat(moistureStr) || 0;
+    const rem = parseFloat(remStr) || 0;
+    const { basePrice } = inputs;
 
     // 1. Tính Độ (độ ẩm cộng thêm)
     const moistureBonus = getMoistureBonus(moisture);
@@ -148,24 +163,33 @@ export default function PepperTab({ onSaveRecord }: PepperTabProps) {
     setCalcSteps(steps);
     // Reset notification trigger on edit
     setIsSaved(false);
-  }, [inputs]);
+  }, [weightStr, moistureStr, remStr, inputs]);
 
   // Các hàm điều chỉnh giá trị Input
-  const handlePercentStep = (field: keyof PepperInput, step: number) => {
-    setInputs((prev) => {
-      const val = prev[field] + step;
-      // Giới hạn hợp lý
-      const clamped = Math.max(0, parseFloat(val.toFixed(2)));
-      return { ...prev, [field]: clamped };
-    });
+  const handlePercentStep = (field: 'weight' | 'moisture' | 'rem', step: number) => {
+    if (field === 'weight') {
+      const current = parseFloat(weightStr) || 0;
+      const next = Math.max(0, current + step);
+      setWeightStr(next.toString());
+    } else if (field === 'moisture') {
+      const current = parseFloat(moistureStr) || 0;
+      const next = Math.max(0, parseFloat((current + step).toFixed(2)));
+      setMoistureStr(next.toString());
+    } else if (field === 'rem') {
+      const current = parseFloat(remStr) || 0;
+      const next = Math.max(0, parseFloat((current + step).toFixed(2)));
+      setRemStr(next.toString());
+    }
   };
 
-  const handleInputChange = (field: keyof PepperInput, value: string) => {
-    const parsed = value === '' ? 0 : parseFloat(value);
-    setInputs((prev) => ({
-      ...prev,
-      [field]: isNaN(parsed) ? 0 : parsed,
-    }));
+  const handleInputChange = (field: 'weight' | 'moisture' | 'rem', value: string) => {
+    if (field === 'weight') {
+      setWeightStr(value);
+    } else if (field === 'moisture') {
+      setMoistureStr(value);
+    } else if (field === 'rem') {
+      setRemStr(value);
+    }
   };
 
   const handleBasePriceChange = (value: string) => {
@@ -179,21 +203,24 @@ export default function PepperTab({ onSaveRecord }: PepperTabProps) {
   };
 
   const saveRecord = () => {
-    const moistureBonusPercent = getMoistureBonus(inputs.moisture);
+    const weight = parseFloat(weightStr) || 0;
+    const moisture = parseFloat(moistureStr) || 0;
+    const rem = parseFloat(remStr) || 0;
+    const moistureBonusPercent = getMoistureBonus(moisture);
 
     onSaveRecord({
       productType: 'tiêu',
       productName: 'Hạt Tiêu',
-      weight: inputs.weight,
-      moisture: inputs.moisture,
+      weight: weight,
+      moisture: moisture,
       basePrice: inputs.basePrice,
       finalPrice: finalPrice,
       totalAmount: totalAmount,
       details: {
-        rem: inputs.rem,
+        rem: rem,
         moistureBonusPercent: parseFloat(moistureBonusPercent.toFixed(2)),
-        remBonusPercent: parseFloat(((inputs.rem - 5) * 10).toFixed(2)),
-        totalAdjustmentPercent: parseFloat((((inputs.rem - 5) * 10) + moistureBonusPercent).toFixed(2)),
+        remBonusPercent: parseFloat(((rem - 5) * 10).toFixed(2)),
+        totalAdjustmentPercent: parseFloat((((rem - 5) * 10) + moistureBonusPercent).toFixed(2)),
         formulaSteps: calcSteps,
       },
     });
@@ -256,7 +283,7 @@ export default function PepperTab({ onSaveRecord }: PepperTabProps) {
               <input
                 id="input-pepper-weight"
                 type="number"
-                value={inputs.weight || ''}
+                value={weightStr}
                 onChange={(e) => handleInputChange('weight', e.target.value)}
                 className="w-20 text-center bg-transparent text-sm font-bold text-[#007AFF] outline-hidden placeholder-zinc-300 focus:ring-0 border-none"
                 placeholder="0"
@@ -276,7 +303,7 @@ export default function PepperTab({ onSaveRecord }: PepperTabProps) {
             <div className="flex flex-col">
               <div className="flex items-center space-x-1.5">
                 <span className="text-sm font-bold text-zinc-800">Độ Ẩm (%)</span>
-                {inputs.moisture <= 15 ? (
+                {(parseFloat(moistureStr) || 0) <= 15 ? (
                   <span className="px-1.5 py-0.5 bg-emerald-50 text-[10px] font-extrabold text-emerald-600 rounded">Ẩm chuẩn</span>
                 ) : (
                   <span className="px-1.5 py-0.5 bg-amber-50 text-[10px] font-extrabold text-amber-600 rounded">Ẩm cao</span>
@@ -296,7 +323,7 @@ export default function PepperTab({ onSaveRecord }: PepperTabProps) {
                 id="input-pepper-moisture"
                 type="number"
                 step="0.1"
-                value={inputs.moisture || ''}
+                value={moistureStr}
                 onChange={(e) => handleInputChange('moisture', e.target.value)}
                 className="w-16 text-center bg-transparent text-sm font-bold text-[#007AFF] outline-hidden focus:ring-0 border-none"
                 placeholder="15.0"
@@ -329,7 +356,7 @@ export default function PepperTab({ onSaveRecord }: PepperTabProps) {
                 id="input-pepper-rem"
                 type="number"
                 step="0.1"
-                value={inputs.rem || ''}
+                value={remStr}
                 onChange={(e) => handleInputChange('rem', e.target.value)}
                 className="w-16 text-center bg-transparent text-sm font-bold text-[#007AFF] outline-hidden focus:ring-0 border-none"
                 placeholder="5.0"
@@ -382,7 +409,7 @@ export default function PepperTab({ onSaveRecord }: PepperTabProps) {
             {formatCurrency(Math.round(totalAmount))}
           </div>
           <span className="text-[10px] text-blue-500 font-semibold block h-4">
-            Khối lượng: {inputs.weight.toLocaleString('vi-VN')} kg
+            Khối lượng: {(parseFloat(weightStr) || 0).toLocaleString('vi-VN')} kg
           </span>
         </div>
       </div>

@@ -3,11 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, ChangeEvent } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   ClipboardList, Egg, Coffee, Star, ShoppingBag, Info, 
-  ChevronRight, Compass, ShieldCheck 
+  ChevronRight, Compass, ShieldCheck, Warehouse, Upload
 } from 'lucide-react';
 
 import StatusBar from './components/StatusBar';
@@ -15,39 +15,82 @@ import PepperTab from './components/PepperTab';
 import CoffeeTab from './components/CoffeeTab';
 import CornTab from './components/CornTab';
 import HistoryTab from './components/HistoryTab';
+import WarehouseTab from './components/WarehouseTab';
 import { TransactionRecord, ProductType } from './types';
-
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { 
-  ClipboardList, Egg, Coffee, Star, ShoppingBag, Info, 
-  ChevronRight, Compass, ShieldCheck 
-} from 'lucide-react';
-
-import PepperTab from './components/PepperTab';
-import CoffeeTab from './components/CoffeeTab';
-import CornTab from './components/CornTab';
-import HistoryTab from './components/HistoryTab';
-import { TransactionRecord, ProductType } from './types';
-import { formatCurrency } from './utils/exporter';
+import { formatCurrency, exportToCSV, importFromCSV } from './utils/exporter';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<string>('tiêu');
   const [records, setRecords] = useState<TransactionRecord[]>([]);
   const [dateStr, setDateStr] = useState<string>('');
-  const [isSyncing, setIsSyncing] = useState<boolean>(false);
-  const [syncMessage, setSyncMessage] = useState<string>('');
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
 
-  const handleTriggerSync = () => {
-    setIsSyncing(true);
-    setSyncMessage('Đang đồng bộ...');
+  const handleSaveCSV = () => {
+    if (records.length === 0) {
+      alert('Không có dữ liệu giao dịch nào để lưu!');
+      return;
+    }
+    setIsSaving(true);
     setTimeout(() => {
-      setSyncMessage('Đã xong iCloud');
+      exportToCSV(records);
+      setIsSaving(false);
+      setSaveSuccess(true);
       setTimeout(() => {
-        setIsSyncing(false);
-        setSyncMessage('');
-      }, 1500);
-    }, 1000);
+        setSaveSuccess(false);
+      }, 2000);
+    }, 400);
+  };
+
+  const handleImportCSV = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = event.target?.result as string;
+        if (!text) {
+          alert('Không thể đọc dữ liệu file này!');
+          return;
+        }
+
+        const imported = importFromCSV(text);
+        if (imported.length === 0) {
+          alert('Không tìm thấy giao dịch nào hợp lệ từ file CSV đã chọn! Vui lòng kiểm tra lại cấu trúc file.');
+          return;
+        }
+
+        const mode = window.confirm(
+          `Tìm thấy ${imported.length} giao dịch từ file.\n\n` +
+          `Ấn "OK" (Đồng ý) để GỘP các giao dịch này vào danh sách hiện tại (giữ nguyên dữ liệu đang có).\n` +
+          `Ấn "Hủy" (Cancel) để GHI ĐÈ, thay thế hoàn toàn danh sách hiện tại bằng danh sách từ file.`
+        );
+
+        let newRecords: TransactionRecord[] = [];
+        if (mode) {
+          // Gộp tránh trùng ID
+          const existingIds = new Set(records.map(r => r.id));
+          const uniqueImported = imported.filter(r => !existingIds.has(r.id));
+          newRecords = [...records, ...uniqueImported];
+          alert(`Đã gộp thành công ${uniqueImported.length} giao dịch mới vào hệ thống!`);
+        } else {
+          newRecords = imported;
+          alert(`Đã nhập thay thế thành công ${imported.length} giao dịch!`);
+        }
+
+        // Sắp xếp thời gian giảm dần
+        newRecords.sort((a, b) => b.timestamp - a.timestamp);
+
+        setRecords(newRecords);
+        localStorage.setItem('agro_trading_records', JSON.stringify(newRecords));
+      } catch (err) {
+        console.error(err);
+        alert('Gặp lỗi khi xử lý dữ liệu file CSV!');
+      }
+    };
+    reader.readAsText(file, 'UTF-8');
+    e.target.value = ''; // Reset
   };
 
   // 1. Tự động tải nhật ký giao dịch từ localStorage khi khởi chạy
@@ -159,6 +202,11 @@ export default function App() {
     saveRecordsToStorage(filtered);
   };
 
+  const handleUpdateRecord = (updatedRecord: TransactionRecord) => {
+    const updated = records.map(r => r.id === updatedRecord.id ? updatedRecord : r);
+    saveRecordsToStorage(updated);
+  };
+
   // Tính thống kê tổng hôm nay
   const totalWeight = records.reduce((sum, r) => sum + r.weight, 0);
   const totalAmount = records.reduce((sum, r) => sum + r.totalAmount, 0);
@@ -189,10 +237,10 @@ export default function App() {
 
             {/* Desktop Tabs Switcher */}
             <div className="hidden md:flex items-center space-x-1.5 bg-[#F2F2F7] p-1 rounded-xl">
-              {(['tiêu', 'cà phê', 'bắp', 'nhật ký'] as const).map((tab) => {
+              {(['tiêu', 'cà phê', 'bắp', 'kho', 'nhật ký'] as const).map((tab) => {
                 const isActive = activeTab === tab;
-                const IconComponent = tab === 'tiêu' ? Compass : tab === 'cà phê' ? Coffee : tab === 'bắp' ? ShoppingBag : ClipboardList;
-                const label = tab === 'tiêu' ? 'Hạt Tiêu' : tab === 'cà phê' ? 'Cà Phê' : tab === 'bắp' ? 'Bắp Tươi' : 'Nhật Ký Giao Dịch';
+                const IconComponent = tab === 'tiêu' ? Compass : tab === 'cà phê' ? Coffee : tab === 'bắp' ? ShoppingBag : tab === 'kho' ? Warehouse : ClipboardList;
+                const label = tab === 'tiêu' ? 'Hạt Tiêu' : tab === 'cà phê' ? 'Cà Phê' : tab === 'bắp' ? 'Bắp Tươi' : tab === 'kho' ? 'Sơ Đồ Kho' : 'Nhật Ký Giao Dịch';
                 return (
                   <button
                     key={tab}
@@ -217,24 +265,47 @@ export default function App() {
             </div>
 
             {/* Right details & action button */}
-            <div className="flex items-center space-x-3">
-              <div className="hidden lg:flex flex-col text-right">
+            <div className="flex items-center space-x-2">
+              <div className="hidden lg:flex flex-col text-right mr-1">
                 <span className="text-xs font-bold text-zinc-800 capitalize leading-none mb-1">{dateStr}</span>
                 <span className="text-[10px] font-medium text-zinc-400">Giao diện đa thiết bị</span>
               </div>
-              <button 
-                type="button"
-                onClick={handleTriggerSync}
-                id="btn-icloud-sync"
-                className={`px-3 py-1.5 rounded-xl shadow-xs font-bold text-xs uppercase flex items-center space-x-1.5 border border-zinc-200/50 cursor-pointer active:scale-95 transition-all duration-200 shrink-0 ${
-                  isSyncing 
-                    ? 'bg-blue-50 text-blue-600 border-blue-200' 
-                    : 'bg-[#F2F2F7] text-[#007AFF] hover:bg-zinc-200'
-                }`}
-              >
-                <div className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-blue-500 animate-ping' : 'bg-green-500 animate-pulse'}`}></div>
-                <span className="font-sans text-[10px] sm:text-[11px] tracking-wider">{isSyncing ? 'iCloud Syncing' : 'iCloud Sync'}</span>
-              </button>
+              
+              <div className="flex flex-col gap-1 w-[105px]">
+                {/* Nút Nhập File (Import CSV) */}
+                <label 
+                  id="btn-import-local-csv"
+                  className="w-full px-2 py-1 rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-700 font-bold text-[9px] uppercase flex items-center justify-center space-x-1 cursor-pointer active:scale-95 transition-all duration-200 shrink-0 shadow-xs"
+                >
+                  <Upload className="w-3 h-3 text-zinc-500" />
+                  <span className="font-sans text-[9.5px] tracking-wider">Nhập File</span>
+                  <input 
+                    type="file" 
+                    accept=".csv" 
+                    onChange={handleImportCSV} 
+                    className="hidden" 
+                  />
+                </label>
+
+                {/* Nút Lưu Máy (Export CSV) */}
+                <button 
+                  type="button"
+                  onClick={handleSaveCSV}
+                  id="btn-save-local-csv"
+                  className={`w-full px-2 py-1 rounded-lg shadow-xs font-black text-[9px] uppercase flex items-center justify-center space-x-1 border cursor-pointer active:scale-95 transition-all duration-200 shrink-0 ${
+                    saveSuccess 
+                      ? 'bg-emerald-50 text-emerald-600 border-emerald-200' 
+                      : isSaving 
+                        ? 'bg-zinc-100 text-zinc-500 border-zinc-200' 
+                        : 'bg-emerald-600 text-white hover:bg-emerald-700 border-transparent'
+                  }`}
+                >
+                  <div className={`w-1.5 h-1.5 rounded-full ${saveSuccess ? 'bg-emerald-500 animate-ping' : isSaving ? 'bg-zinc-400 animate-pulse' : 'bg-white animate-pulse'}`}></div>
+                  <span className="font-sans text-[9.5px] tracking-wider">
+                    {saveSuccess ? 'Đã Lưu!' : isSaving ? 'Đang xuất...' : 'Lưu Máy'}
+                  </span>
+                </button>
+              </div>
             </div>
 
           </div>
@@ -243,10 +314,10 @@ export default function App() {
 
       {/* MOBILE HEADER TAB NAVIGATION ROW (Sticky below Header on smaller screens) */}
       <div className="md:hidden bg-white border-b border-zinc-200 py-2.5 px-4 sticky top-16 z-40 shadow-xs flex items-center justify-between gap-1 overflow-x-auto scrollbar-none">
-        {(['tiêu', 'cà phê', 'bắp', 'nhật ký'] as const).map((tab) => {
+        {(['tiêu', 'cà phê', 'bắp', 'kho', 'nhật ký'] as const).map((tab) => {
           const isActive = activeTab === tab;
-          const IconComponent = tab === 'tiêu' ? Compass : tab === 'cà phê' ? Coffee : tab === 'bắp' ? ShoppingBag : ClipboardList;
-          const label = tab === 'tiêu' ? 'Tiêu' : tab === 'cà phê' ? 'Cà Phê' : tab === 'bắp' ? 'Bắp' : 'Nhật Ký';
+          const IconComponent = tab === 'tiêu' ? Compass : tab === 'cà phê' ? Coffee : tab === 'bắp' ? ShoppingBag : tab === 'kho' ? Warehouse : ClipboardList;
+          const label = tab === 'tiêu' ? 'Tiêu' : tab === 'cà phê' ? 'Cà Phê' : tab === 'bắp' ? 'Bắp' : tab === 'kho' ? 'Sơ Đồ' : 'Nhật Ký';
           return (
             <button
               key={tab}
@@ -369,6 +440,18 @@ export default function App() {
               </motion.div>
             )}
 
+            {activeTab === 'kho' && (
+              <motion.div
+                key="kho"
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -15 }}
+                transition={{ duration: 0.18 }}
+              >
+                <WarehouseTab />
+              </motion.div>
+            )}
+
             {activeTab === 'nhật ký' && (
               <motion.div
                 key="nhật ký"
@@ -381,6 +464,7 @@ export default function App() {
                   records={records}
                   onClearRecords={handleClearRecords}
                   onDeleteRecord={handleDeleteRecord}
+                  onUpdateRecord={handleUpdateRecord}
                 />
               </motion.div>
             )}
