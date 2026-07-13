@@ -21,8 +21,9 @@ export default function CornTab({ onSaveRecord }: CornTabProps) {
   });
 
   // Hỗ trợ nhập liệu dạng chuỗi để gõ dấu phẩy/chấm thập phân không bị giật/mất số
-  const [weightStr, setWeightStr] = useState<string>('5000');
-  const [moistureStr, setMoistureStr] = useState<string>('15.0');
+  // Nạp lại giá trị đã nhập từ lần trước (localStorage) để không mất khi reset/tải lại web
+  const [weightStr, setWeightStr] = useState<string>(() => localStorage.getItem('corn_weight') ?? '5000');
+  const [moistureStr, setMoistureStr] = useState<string>(() => localStorage.getItem('corn_moisture') ?? '15.0');
 
   // Trạng thái Ước lượng lời
   const [showProfitCalc, setShowProfitCalc] = useState<boolean>(() => {
@@ -64,6 +65,12 @@ export default function CornTab({ onSaveRecord }: CornTabProps) {
   useEffect(() => {
     localStorage.setItem('corn_show_profit_calc', showProfitCalc.toString());
   }, [showProfitCalc]);
+
+  // Tự động lưu các ô nhập (khối lượng, độ ẩm) để reset web vẫn còn dữ liệu đang nhập
+  useEffect(() => {
+    localStorage.setItem('corn_weight', weightStr);
+    localStorage.setItem('corn_moisture', moistureStr);
+  }, [weightStr, moistureStr]);
 
   const [calcSteps, setCalcSteps] = useState<CalculationDetail[]>([]);
   const [finalPrice, setFinalPrice] = useState<number>(0);

@@ -51,9 +51,11 @@ export default function CoffeeTab({ onSaveRecord }: CoffeeTabProps) {
   // Tải trạng thái và đặc biệt là Giá Sàn từ localStorage
   const [inputs, setInputs] = useState<CoffeeInput>(() => {
     const savedPrice = localStorage.getItem('coffee_base_price');
+    const savedWeight = localStorage.getItem('coffee_weight');
+    const savedMoisture = localStorage.getItem('coffee_moisture');
     return {
-      weight: 3000,
-      moisture: 14.0,
+      weight: savedWeight ? parseFloat(savedWeight) : 3000,
+      moisture: savedMoisture ? parseFloat(savedMoisture) : 14.0,
       impurity: 1.5,
       basePrice: savedPrice ? parseInt(savedPrice, 10) : 120000,
     };
@@ -67,9 +69,15 @@ export default function CoffeeTab({ onSaveRecord }: CoffeeTabProps) {
   const [isSaved, setIsSaved] = useState<boolean>(false);
   const [showDeductionTable, setShowDeductionTable] = useState<boolean>(false);
   
-  // Khảo sát tạp chất từ mẻ nhỏ
-  const [impuritySampleWeight, setImpuritySampleWeight] = useState<number>(200);
-  const [impurityGrams, setImpurityGrams] = useState<number>(3.0);
+  // Khảo sát tạp chất từ mẻ nhỏ (nạp lại từ localStorage nếu đã nhập trước đó)
+  const [impuritySampleWeight, setImpuritySampleWeight] = useState<number>(() => {
+    const saved = localStorage.getItem('coffee_impurity_sample_weight');
+    return saved ? parseFloat(saved) : 200;
+  });
+  const [impurityGrams, setImpurityGrams] = useState<number>(() => {
+    const saved = localStorage.getItem('coffee_impurity_grams');
+    return saved ? parseFloat(saved) : 3.0;
+  });
 
   // Lưu Giá Sàn tự động bất cứ khi nào nó thay đổi để không bị mất khi thoát
   useEffect(() => {
@@ -77,6 +85,18 @@ export default function CoffeeTab({ onSaveRecord }: CoffeeTabProps) {
       localStorage.setItem('coffee_base_price', inputs.basePrice.toString());
     }
   }, [inputs.basePrice]);
+
+  // Tự động lưu khối lượng & độ ẩm để reset web vẫn còn dữ liệu đang nhập
+  useEffect(() => {
+    localStorage.setItem('coffee_weight', inputs.weight.toString());
+    localStorage.setItem('coffee_moisture', inputs.moisture.toString());
+  }, [inputs.weight, inputs.moisture]);
+
+  // Tự động lưu mẫu khảo sát tạp chất
+  useEffect(() => {
+    localStorage.setItem('coffee_impurity_sample_weight', impuritySampleWeight.toString());
+    localStorage.setItem('coffee_impurity_grams', impurityGrams.toString());
+  }, [impuritySampleWeight, impurityGrams]);
 
   useEffect(() => {
     const calcImpurity = impuritySampleWeight > 0 ? (impurityGrams / impuritySampleWeight) * 100 : 0;

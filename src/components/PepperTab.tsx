@@ -22,9 +22,10 @@ export default function PepperTab({ onSaveRecord }: PepperTabProps) {
   });
 
   // Hỗ trợ gõ số thập phân hoàn hảo không giật lag
-  const [weightStr, setWeightStr] = useState<string>('2500');
-  const [moistureStr, setMoistureStr] = useState<string>('12.5');
-  const [remStr, setRemStr] = useState<string>('5.4');
+  // Nạp lại giá trị đã nhập từ lần trước (localStorage) để không mất khi reset/tải lại web
+  const [weightStr, setWeightStr] = useState<string>(() => localStorage.getItem('pepper_weight') ?? '2500');
+  const [moistureStr, setMoistureStr] = useState<string>(() => localStorage.getItem('pepper_moisture') ?? '12.5');
+  const [remStr, setRemStr] = useState<string>(() => localStorage.getItem('pepper_rem') ?? '5.4');
 
   // Lưu Giá Sàn tự động bất cứ khi nào nó thay đổi để không bị mất khi thoát
   useEffect(() => {
@@ -32,6 +33,13 @@ export default function PepperTab({ onSaveRecord }: PepperTabProps) {
       localStorage.setItem('pepper_base_price', inputs.basePrice.toString());
     }
   }, [inputs.basePrice]);
+
+  // Tự động lưu các ô nhập (khối lượng, độ ẩm, Rem) để reset web vẫn còn dữ liệu đang nhập
+  useEffect(() => {
+    localStorage.setItem('pepper_weight', weightStr);
+    localStorage.setItem('pepper_moisture', moistureStr);
+    localStorage.setItem('pepper_rem', remStr);
+  }, [weightStr, moistureStr, remStr]);
 
   const [calcSteps, setCalcSteps] = useState<CalculationDetail[]>([]);
   const [finalPrice, setFinalPrice] = useState<number>(0);
@@ -458,7 +466,7 @@ export default function PepperTab({ onSaveRecord }: PepperTabProps) {
           {/* CHỮ KÝ MINH BẠCH GIAO DỊCH */}
           <div className="pt-2 bg-[#F2F2F7] rounded-xl p-3.5 text-[11px] text-zinc-650 leading-relaxed border border-zinc-200/55">
             <p className="font-bold text-zinc-800 mb-1">📋 Sơ đồ logic tóm tắt:</p>
-            Do tỷ lệ Rem lệch <span className="font-bold text-zinc-700">{((inputs.rem - 5) * 10) >= 0 ? '+' : ''}{((inputs.rem - 5) * 10).toFixed(2)}%</span> kết hợp độ ẩm <span className="font-bold text-zinc-700">{getMoistureBonus(inputs.moisture) >= 0 ? '+' : ''}{getMoistureBonus(inputs.moisture).toFixed(2)}%</span>, tổng tỉ suất điều chỉnh đạt <span className="font-bold text-zinc-900 text-xs">{(((inputs.rem - 5) * 10) + getMoistureBonus(inputs.moisture)) >= 0 ? '+' : ''}{(((inputs.rem - 5) * 10) + getMoistureBonus(inputs.moisture)).toFixed(2)}%</span>. Đọc kiểm định thông số của mẻ hạt đạt chuẩn giao kèo.
+            Do tỷ lệ Rem lệch <span className="font-bold text-zinc-700">{(((parseFloat(remStr) || 0) - 5) * 10) >= 0 ? '+' : ''}{(((parseFloat(remStr) || 0) - 5) * 10).toFixed(2)}%</span> kết hợp độ ẩm <span className="font-bold text-zinc-700">{getMoistureBonus(parseFloat(moistureStr) || 0) >= 0 ? '+' : ''}{getMoistureBonus(parseFloat(moistureStr) || 0).toFixed(2)}%</span>, tổng tỉ suất điều chỉnh đạt <span className="font-bold text-zinc-900 text-xs">{((((parseFloat(remStr) || 0) - 5) * 10) + getMoistureBonus(parseFloat(moistureStr) || 0)) >= 0 ? '+' : ''}{((((parseFloat(remStr) || 0) - 5) * 10) + getMoistureBonus(parseFloat(moistureStr) || 0)).toFixed(2)}%</span>. Đọc kiểm định thông số của mẻ hạt đạt chuẩn giao kèo.
           </div>
 
           {/* LƯU TRỮ VÀO NHẬT KÝ */}
