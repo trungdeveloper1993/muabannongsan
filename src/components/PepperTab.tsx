@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, FocusEvent } from 'react';
 import { Plus, Minus, Save, Sparkles, HelpCircle, Receipt } from 'lucide-react';
 import { PepperInput, CalculationDetail, TransactionRecord, ProductType } from '../types';
 import { formatCurrency } from '../utils/exporter';
@@ -210,6 +210,33 @@ export default function PepperTab({ onSaveRecord }: PepperTabProps) {
     }));
   };
 
+  // Khi bấm vào ô nhập: tạm xoá trống để gõ số mới ngay, số cũ hiện mờ (placeholder).
+  // Nếu rời ô mà không nhập gì thì tự khôi phục lại số cũ.
+  const clearOnFocus = (setter: (v: string) => void, oldVal: string, fallback: string) => ({
+    onFocus: (e: FocusEvent<HTMLInputElement>) => {
+      e.currentTarget.dataset.prev = oldVal;
+      e.currentTarget.placeholder = oldVal !== '' ? oldVal : fallback;
+      setter('');
+    },
+    onBlur: (e: FocusEvent<HTMLInputElement>) => {
+      if (e.currentTarget.value === '') setter(e.currentTarget.dataset.prev ?? '');
+      e.currentTarget.placeholder = fallback;
+    },
+  });
+
+  // Tương tự nhưng cho ô Đơn Giá Gốc (giá trị là số, hiển thị có định dạng).
+  const clearPriceOnFocus = (fallback: string) => ({
+    onFocus: (e: FocusEvent<HTMLInputElement>) => {
+      e.currentTarget.dataset.prev = inputs.basePrice ? inputs.basePrice.toString() : '';
+      e.currentTarget.placeholder = inputs.basePrice ? inputs.basePrice.toLocaleString('vi-VN') : fallback;
+      handleBasePriceChange('');
+    },
+    onBlur: (e: FocusEvent<HTMLInputElement>) => {
+      if (e.currentTarget.value === '') handleBasePriceChange(e.currentTarget.dataset.prev ?? '');
+      e.currentTarget.placeholder = fallback;
+    },
+  });
+
   const saveRecord = () => {
     const weight = parseFloat(weightStr) || 0;
     const moisture = parseFloat(moistureStr) || 0;
@@ -293,6 +320,7 @@ export default function PepperTab({ onSaveRecord }: PepperTabProps) {
                 type="number"
                 value={weightStr}
                 onChange={(e) => handleInputChange('weight', e.target.value)}
+                {...clearOnFocus(setWeightStr, weightStr, '0')}
                 className="w-20 text-center bg-transparent text-sm font-bold text-[#007AFF] outline-hidden placeholder-zinc-300 focus:ring-0 border-none"
                 placeholder="0"
               />
@@ -333,6 +361,7 @@ export default function PepperTab({ onSaveRecord }: PepperTabProps) {
                 step="0.1"
                 value={moistureStr}
                 onChange={(e) => handleInputChange('moisture', e.target.value)}
+                {...clearOnFocus(setMoistureStr, moistureStr, '15.0')}
                 className="w-16 text-center bg-transparent text-sm font-bold text-[#007AFF] outline-hidden focus:ring-0 border-none"
                 placeholder="15.0"
               />
@@ -366,6 +395,7 @@ export default function PepperTab({ onSaveRecord }: PepperTabProps) {
                 step="0.1"
                 value={remStr}
                 onChange={(e) => handleInputChange('rem', e.target.value)}
+                {...clearOnFocus(setRemStr, remStr, '5.0')}
                 className="w-16 text-center bg-transparent text-sm font-bold text-[#007AFF] outline-hidden focus:ring-0 border-none"
                 placeholder="5.0"
               />
@@ -389,8 +419,10 @@ export default function PepperTab({ onSaveRecord }: PepperTabProps) {
               <input
                 id="input-pepper-price"
                 type="text"
+                inputMode="numeric"
                 value={inputs.basePrice ? inputs.basePrice.toLocaleString('vi-VN') : ''}
                 onChange={(e) => handleBasePriceChange(e.target.value)}
+                {...clearPriceOnFocus('100,000')}
                 className="w-28 text-right bg-transparent text-base font-extrabold text-[#007AFF] outline-hidden placeholder-zinc-300 focus:ring-0 border-none"
                 placeholder="100,000"
               />
