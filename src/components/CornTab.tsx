@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, FocusEvent } from 'react';
 import { Plus, Minus, Save, Receipt, TrendingUp, DollarSign, ShieldCheck } from 'lucide-react';
 import { CalculationDetail, TransactionRecord } from '../types';
 import { formatCurrency } from '../utils/exporter';
@@ -175,6 +175,33 @@ export default function CornTab({ onSaveRecord }: CornTabProps) {
     }));
   };
 
+  // Khi bấm vào ô nhập: tạm xoá trống để gõ số mới ngay, số cũ hiện mờ (placeholder).
+  // Nếu rời ô mà không nhập gì thì tự khôi phục lại số cũ.
+  const clearOnFocus = (setter: (v: string) => void, oldVal: string, fallback: string) => ({
+    onFocus: (e: FocusEvent<HTMLInputElement>) => {
+      e.currentTarget.dataset.prev = oldVal;
+      e.currentTarget.placeholder = oldVal !== '' ? oldVal : fallback;
+      setter('');
+    },
+    onBlur: (e: FocusEvent<HTMLInputElement>) => {
+      if (e.currentTarget.value === '') setter(e.currentTarget.dataset.prev ?? '');
+      e.currentTarget.placeholder = fallback;
+    },
+  });
+
+  // Tương tự nhưng cho ô Đơn Giá Sàn (giá trị là số, hiển thị có định dạng).
+  const clearPriceOnFocus = (fallback: string) => ({
+    onFocus: (e: FocusEvent<HTMLInputElement>) => {
+      e.currentTarget.dataset.prev = inputs.basePrice ? inputs.basePrice.toString() : '';
+      e.currentTarget.placeholder = inputs.basePrice ? inputs.basePrice.toLocaleString('vi-VN') : fallback;
+      handleBasePriceChange('');
+    },
+    onBlur: (e: FocusEvent<HTMLInputElement>) => {
+      if (e.currentTarget.value === '') handleBasePriceChange(e.currentTarget.dataset.prev ?? '');
+      e.currentTarget.placeholder = fallback;
+    },
+  });
+
   const saveRecord = () => {
     const weight = parseFloat(weightStr) || 0;
     const moisture = parseFloat(moistureStr) || 0;
@@ -258,6 +285,7 @@ export default function CornTab({ onSaveRecord }: CornTabProps) {
                   type="number"
                   value={weightStr}
                   onChange={(e) => handleInputChange('weight', e.target.value)}
+                  {...clearOnFocus(setWeightStr, weightStr, '0')}
                   className="w-20 text-center bg-transparent text-sm font-bold text-[#007AFF] outline-hidden placeholder-zinc-300 focus:ring-0 border-none"
                   placeholder="0"
                 />
@@ -294,6 +322,7 @@ export default function CornTab({ onSaveRecord }: CornTabProps) {
                   step="0.1"
                   value={moistureStr}
                   onChange={(e) => handleInputChange('moisture', e.target.value)}
+                  {...clearOnFocus(setMoistureStr, moistureStr, '15.0')}
                   className="w-16 text-center bg-transparent text-sm font-bold text-[#007AFF] outline-hidden focus:ring-0 border-none"
                   placeholder="15.0"
                 />
@@ -317,8 +346,10 @@ export default function CornTab({ onSaveRecord }: CornTabProps) {
                 <input
                   id="input-corn-price"
                   type="text"
+                  inputMode="numeric"
                   value={inputs.basePrice ? inputs.basePrice.toLocaleString('vi-VN') : ''}
                   onChange={(e) => handleBasePriceChange(e.target.value)}
+                  {...clearPriceOnFocus('6,500')}
                   className="w-28 text-right bg-transparent text-base font-extrabold text-[#007AFF] outline-hidden focus:ring-0 border-none"
                   placeholder="6,500"
                 />
