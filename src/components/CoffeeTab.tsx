@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, FocusEvent } from 'react';
 import { Plus, Minus, Save, Sparkles, HelpCircle, Receipt, Droplets, Scale, Info, ArrowDown, ArrowUp } from 'lucide-react';
 import { CoffeeInput, CalculationDetail, TransactionRecord } from '../types';
 import { formatCurrency } from '../utils/exporter';
@@ -239,6 +239,47 @@ export default function CoffeeTab({ onSaveRecord }: CoffeeTabProps) {
     }));
   };
 
+  // Khi bấm vào ô nhập: tạm xoá trống để gõ số mới ngay, số cũ hiện mờ (placeholder).
+  // Nếu rời ô mà không nhập gì thì tự khôi phục lại số cũ.
+  // Biến thể cho ô thuộc object `inputs` (khối lượng, độ ẩm).
+  const clearFieldOnFocus = (field: keyof CoffeeInput, oldVal: number, fallback: string) => ({
+    onFocus: (e: FocusEvent<HTMLInputElement>) => {
+      e.currentTarget.dataset.prev = oldVal ? oldVal.toString() : '';
+      e.currentTarget.placeholder = oldVal ? oldVal.toString() : fallback;
+      handleInputChange(field, '');
+    },
+    onBlur: (e: FocusEvent<HTMLInputElement>) => {
+      if (e.currentTarget.value === '') handleInputChange(field, e.currentTarget.dataset.prev ?? '');
+      e.currentTarget.placeholder = fallback;
+    },
+  });
+
+  // Biến thể cho ô Giá Sàn (số có định dạng).
+  const clearPriceOnFocus = (fallback: string) => ({
+    onFocus: (e: FocusEvent<HTMLInputElement>) => {
+      e.currentTarget.dataset.prev = inputs.basePrice ? inputs.basePrice.toString() : '';
+      e.currentTarget.placeholder = inputs.basePrice ? inputs.basePrice.toLocaleString('vi-VN') : fallback;
+      handleBasePriceChange('');
+    },
+    onBlur: (e: FocusEvent<HTMLInputElement>) => {
+      if (e.currentTarget.value === '') handleBasePriceChange(e.currentTarget.dataset.prev ?? '');
+      e.currentTarget.placeholder = fallback;
+    },
+  });
+
+  // Biến thể cho ô số dùng setter riêng (mẫu khảo sát tạp chất).
+  const clearNumOnFocus = (setter: (v: number) => void, oldVal: number, fallback: string) => ({
+    onFocus: (e: FocusEvent<HTMLInputElement>) => {
+      e.currentTarget.dataset.prev = oldVal ? oldVal.toString() : '';
+      e.currentTarget.placeholder = oldVal ? oldVal.toString() : fallback;
+      setter(0);
+    },
+    onBlur: (e: FocusEvent<HTMLInputElement>) => {
+      if (e.currentTarget.value === '') setter(parseFloat(e.currentTarget.dataset.prev || '0') || 0);
+      e.currentTarget.placeholder = fallback;
+    },
+  });
+
   const saveRecord = () => {
     onSaveRecord({
       productType: 'cà phê',
@@ -321,6 +362,7 @@ export default function CoffeeTab({ onSaveRecord }: CoffeeTabProps) {
                   type="number"
                   value={inputs.weight || ''}
                   onChange={(e) => handleInputChange('weight', e.target.value)}
+                  {...clearFieldOnFocus('weight', inputs.weight, '0')}
                   className="w-20 text-center bg-transparent text-sm font-black text-[#007AFF] outline-hidden placeholder-zinc-300 focus:ring-0 border-none"
                   placeholder="0"
                 />
@@ -346,8 +388,10 @@ export default function CoffeeTab({ onSaveRecord }: CoffeeTabProps) {
                 <input
                   id="input-coffee-price"
                   type="text"
+                  inputMode="numeric"
                   value={inputs.basePrice ? inputs.basePrice.toLocaleString('vi-VN') : ''}
                   onChange={(e) => handleBasePriceChange(e.target.value)}
+                  {...clearPriceOnFocus('120,000')}
                   className="w-28 text-right bg-transparent text-base font-black text-[#007AFF] outline-hidden focus:ring-0 border-none"
                   placeholder="120,000"
                 />
@@ -387,6 +431,7 @@ export default function CoffeeTab({ onSaveRecord }: CoffeeTabProps) {
                     step="0.1"
                     value={inputs.moisture || ''}
                     onChange={(e) => handleInputChange('moisture', e.target.value)}
+                    {...clearFieldOnFocus('moisture', inputs.moisture, '15.0')}
                     className="w-16 text-center bg-transparent text-sm font-bold text-[#007AFF] outline-hidden focus:ring-0 border-none"
                     placeholder="15.0"
                   />
@@ -444,6 +489,7 @@ export default function CoffeeTab({ onSaveRecord }: CoffeeTabProps) {
                           const parsed = parseFloat(e.target.value);
                           setImpuritySampleWeight(isNaN(parsed) ? 0 : parsed);
                         }}
+                        {...clearNumOnFocus(setImpuritySampleWeight, impuritySampleWeight, '200')}
                         className="w-full text-center bg-transparent text-xs font-extrabold text-[#007AFF] outline-hidden focus:ring-0 border-none p-0"
                       />
                       <span className="text-[10px] font-bold text-zinc-400 shrink-0 ml-0.5">g</span>
@@ -478,6 +524,7 @@ export default function CoffeeTab({ onSaveRecord }: CoffeeTabProps) {
                           const parsed = parseFloat(e.target.value);
                           setImpurityGrams(isNaN(parsed) ? 0 : parsed);
                         }}
+                        {...clearNumOnFocus(setImpurityGrams, impurityGrams, '3.0')}
                         className="w-full text-center bg-transparent text-xs font-extrabold text-[#007AFF] outline-hidden focus:ring-0 border-none p-0"
                       />
                       <span className="text-[10px] font-bold text-zinc-400 shrink-0 ml-0.5">g</span>
