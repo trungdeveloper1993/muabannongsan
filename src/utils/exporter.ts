@@ -27,11 +27,17 @@ export function formatDateTime(timestamp: number): string {
 }
 
 /**
- * Xuất dữ liệu nhật ký giao dịch nông sản ra file CSV
+ * Khoá tháng (YYYY-MM) của một timestamp — dùng để nhóm/sao lưu theo tháng
  */
-export function exportToCSV(records: TransactionRecord[]): void {
-  if (records.length === 0) return;
+export function getMonthKey(timestamp: number): string {
+  const d = new Date(timestamp);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
 
+/**
+ * Dựng nội dung CSV (kèm cột thông tin khách hàng) từ danh sách giao dịch
+ */
+function buildCSVContent(records: TransactionRecord[]): string {
   const headers = [
     'Mã Giao Dịch',
     'Thời Gian',
@@ -45,6 +51,9 @@ export function exportToCSV(records: TransactionRecord[]): void {
     'Giá Gốc (Đồng/Kg)',
     'Giá Cuối (Đồng/Kg)',
     'Thành Tiền (Đồng)',
+    'Tên Khách Hàng',
+    'Địa Chỉ',
+    'CCCD',
   ];
 
   const rows = records.map((rec) => {
@@ -71,10 +80,13 @@ export function exportToCSV(records: TransactionRecord[]): void {
       rec.basePrice,
       Math.round(rec.finalPrice),
       Math.round(rec.totalAmount),
+      rec.customer?.name ?? '',
+      rec.customer?.address ?? '',
+      rec.customer?.cccd ?? '',
     ];
   });
 
-  const csvContent = [
+  return [
     headers.join(','),
     ...rows.map((row) =>
       row
@@ -86,6 +98,14 @@ export function exportToCSV(records: TransactionRecord[]): void {
         .join(',')
     ),
   ].join('\n');
+}
+
+/**
+ * Tải một danh sách giao dịch xuống file CSV với tên tuỳ ý
+ */
+export function downloadCSV(records: TransactionRecord[], fileName: string): void {
+  if (records.length === 0) return;
+  const csvContent = buildCSVContent(records);
 
   // Thêm BOM (Byte Order Mark) để Excel đọc hiển thị đúng dấu UTF-8 (tiếng Việt)
   const blob = new Blob([new Uint8Array([0xef, 0xbb, 0xbf]), csvContent], {
@@ -94,19 +114,34 @@ export function exportToCSV(records: TransactionRecord[]): void {
 
   const link = document.createElement('a');
   const url = URL.createObjectURL(blob);
-  
-  // Tạo tên file định dạng: Nhat_Ky_Mua_Ban_Nong_San_YYYY_MM_DD.csv
-  const today = new Date();
-  const dateStr = `${today.getFullYear()}_${String(today.getMonth() + 1).padStart(2, '0')}_${String(
-    today.getDate()
-  ).padStart(2, '0')}`;
-  
   link.setAttribute('href', url);
-  link.setAttribute('download', `Nhat_Ky_Mua_Ban_Nong_San_${dateStr}.csv`);
+  link.setAttribute('download', fileName);
   link.style.visibility = 'hidden';
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Xuất toàn bộ nhật ký ra file CSV (tên theo ngày hôm nay)
+ */
+export function exportToCSV(records: TransactionRecord[]): void {
+  const today = new Date();
+  const dateStr = `${today.getFullYear()}_${String(today.getMonth() + 1).padStart(2, '0')}_${String(
+    today.getDate()
+  ).padStart(2, '0')}`;
+  downloadCSV(records, `Nhat_Ky_Mua_Ban_Nong_San_${dateStr}.csv`);
+}
+
+/**
+ * Xuất/sao lưu các giao dịch của MỘT tháng (monthKey dạng YYYY-MM) ra file CSV riêng
+ */
+export function exportMonthlyCSV(records: TransactionRecord[], monthKey: string): void {
+  const monthRecords = records.filter((r) => getMonthKey(r.timestamp) === monthKey);
+  if (monthRecords.length === 0) return;
+  const [y, m] = monthKey.split('-');
+  downloadCSV(monthRecords, `Nong_San_Sao_Luu_${y}_${m}.csv`);
 }
 
 /**
@@ -262,6 +297,14 @@ export function importFromCSV(csvContent: string): TransactionRecord[] {
         ];
       }
 
+      // Thông tin khách hàng (nếu file có các cột này)
+      const custName = (cols[12] ?? '').trim();
+      const custAddress = (cols[13] ?? '').trim();
+      const custCccd = (cols[14] ?? '').trim();
+      const customer = (custName || custAddress || custCccd)
+        ? { name: custName, address: custAddress, cccd: custCccd }
+        : undefined;
+
       records.push({
         id,
         timestamp,
@@ -273,6 +316,7 @@ export function importFromCSV(csvContent: string): TransactionRecord[] {
         basePrice,
         finalPrice,
         totalAmount,
+        ...(customer ? { customer } : {}),
         details
       });
     } catch (e) {

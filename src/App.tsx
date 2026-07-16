@@ -16,8 +16,11 @@ import CoffeeTab from './components/CoffeeTab';
 import CornTab from './components/CornTab';
 import HistoryTab from './components/HistoryTab';
 import WarehouseTab from './components/WarehouseTab';
-import { TransactionRecord, ProductType } from './types';
+import CustomerForm from './components/CustomerForm';
+import { TransactionRecord, ProductType, Customer } from './types';
 import { formatCurrency, exportToCSV, importFromCSV } from './utils/exporter';
+
+const EMPTY_CUSTOMER: Customer = { name: '', address: '', cccd: '' };
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<string>('tiêu');
@@ -25,6 +28,46 @@ export default function App() {
   const [dateStr, setDateStr] = useState<string>('');
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
+
+  // Thông tin khách hàng đang nhập (dùng chung 3 tab) + danh bạ khách hàng đã lưu
+  const [customer, setCustomer] = useState<Customer>(() => {
+    try {
+      const saved = localStorage.getItem('agro_current_customer');
+      return saved ? JSON.parse(saved) : EMPTY_CUSTOMER;
+    } catch { return EMPTY_CUSTOMER; }
+  });
+  const [customers, setCustomers] = useState<Customer[]>(() => {
+    try {
+      const saved = localStorage.getItem('agro_customers');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+
+  // Lưu lại thông tin khách đang nhập để reset web vẫn còn
+  useEffect(() => {
+    localStorage.setItem('agro_current_customer', JSON.stringify(customer));
+  }, [customer]);
+
+  // Thêm/cập nhật một khách vào danh bạ (trùng theo CCCD nếu có, nếu không theo tên)
+  const upsertCustomer = (c: Customer) => {
+    const name = c.name.trim();
+    const cccd = c.cccd.trim();
+    if (!name && !cccd) return;
+    setCustomers((prev) => {
+      const idx = prev.findIndex((x) =>
+        cccd ? x.cccd.trim() === cccd : x.name.trim().toLowerCase() === name.toLowerCase()
+      );
+      let next: Customer[];
+      if (idx >= 0) {
+        next = [...prev];
+        next[idx] = { name, address: c.address.trim(), cccd };
+      } else {
+        next = [...prev, { name, address: c.address.trim(), cccd }];
+      }
+      localStorage.setItem('agro_customers', JSON.stringify(next));
+      return next;
+    });
+  };
 
   const handleSaveCSV = () => {
     if (records.length === 0) {
@@ -182,12 +225,25 @@ export default function App() {
     const randId = Math.floor(1000 + Math.random() * 9000);
     const id = `${prefix}-${randId}`;
     
+    // Chỉ gắn thông tin khách hàng nếu có nhập (tuỳ chọn) — không nhập vẫn lưu bình thường
+    const hasCustomer = !!(customer.name.trim() || customer.cccd.trim() || customer.address.trim());
+
     const recordWithId: TransactionRecord = {
       ...newRec,
       id,
       timestamp: Date.now(),
       dateKey: new Date().toISOString().split('T')[0],
+      ...(hasCustomer ? { customer: {
+        name: customer.name.trim(),
+        address: customer.address.trim(),
+        cccd: customer.cccd.trim(),
+      } } : {}),
     };
+
+    // Khách mới thì tự lưu vào danh bạ để lần sau gợi ý chọn lại
+    if (hasCustomer) {
+      upsertCustomer(customer);
+    }
 
     saveRecordsToStorage([recordWithId, ...records]);
   };
@@ -400,6 +456,13 @@ export default function App() {
 
           </div>
         </section>
+
+        {/* THÔNG TIN KHÁCH HÀNG (DÙNG CHUNG 3 TAB TÍNH TOÁN) */}
+        {(activeTab === 'tiêu' || activeTab === 'cà phê' || activeTab === 'bắp') && (
+          <section>
+            <CustomerForm customer={customer} onChange={setCustomer} customers={customers} />
+          </section>
+        )}
 
         {/* CONTAINER CHỨA NỘI DUNG FORM TÍNH TOÁN */}
         <section className="bg-transparent">

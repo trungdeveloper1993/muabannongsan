@@ -5,6 +5,13 @@
 
 export type ProductType = 'tiêu' | 'cà phê' | 'bắp';
 
+// Thông tin khách hàng (tuỳ chọn) dùng chung cho cả 3 loại nông sản
+export interface Customer {
+  name: string;    // Tên khách hàng
+  address: string; // Địa chỉ
+  cccd: string;    // Số căn cước công dân
+}
+
 export interface BaseInput {
   weight: number;      // Số Kg
   moisture: number;    // Độ ẩm (%)
@@ -43,6 +50,7 @@ export interface TransactionRecord {
   basePrice: number;
   finalPrice: number;
   totalAmount: number;
+  customer?: Customer; // Thông tin khách hàng (nếu có nhập khi lưu)
   details: {
     rem?: number;
     blackBroken?: number;
