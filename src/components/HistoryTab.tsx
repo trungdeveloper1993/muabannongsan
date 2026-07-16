@@ -4,12 +4,13 @@
  */
 
 import { useState } from 'react';
-import { 
-  FileText, Trash2, Search, Calendar, ChevronRight, ChevronDown, 
-  ChevronUp, Filter, AlertTriangle, Check, Edit3, X, Save, RotateCcw, Plus, Minus, ShieldAlert
+import {
+  FileText, Trash2, Search, Calendar, ChevronRight, ChevronDown,
+  ChevronUp, Filter, AlertTriangle, Check, Edit3, X, Save, RotateCcw, Plus, Minus, ShieldAlert,
+  Download, CloudUpload, User, MapPin, IdCard
 } from 'lucide-react';
 import { TransactionRecord, TradingStats } from '../types';
-import { formatCurrency, formatDateTime, exportToCSV } from '../utils/exporter';
+import { formatCurrency, formatDateTime, exportToCSV, exportMonthlyCSV, getMonthKey } from '../utils/exporter';
 import { getCoffeeMoistureDeduction } from './CoffeeTab';
 
 interface HistoryTabProps {
@@ -40,6 +41,7 @@ export default function HistoryTab({
   const [expandedRecordId, setExpandedRecordId] = useState<string | null>(null);
   const [showConfirmClear, setShowConfirmClear] = useState<boolean>(false);
   const [successExport, setSuccessExport] = useState<boolean>(false);
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => getMonthKey(Date.now()));
 
   // States hỗ trợ chỉnh sửa (Edit) tham số của mẻ hàng
   const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
@@ -242,7 +244,9 @@ export default function HistoryTab({
       rec.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       rec.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       rec.weight.toString().includes(searchTerm) ||
-      rec.totalAmount.toString().includes(searchTerm);
+      rec.totalAmount.toString().includes(searchTerm) ||
+      (rec.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
+      (rec.customer?.cccd?.includes(searchTerm) ?? false);
     
     const matchesType = selectedType === 'all' || rec.productType === selectedType;
 
@@ -264,6 +268,25 @@ export default function HistoryTab({
     setTimeout(() => {
       setSuccessExport(false);
     }, 3500);
+  };
+
+  // Danh sách các tháng có dữ liệu (kèm tháng hiện tại) để sao lưu theo tháng
+  const monthKeysWithData = Array.from(new Set(records.map((r) => getMonthKey(r.timestamp))));
+  const currentMonthKey = getMonthKey(Date.now());
+  const availableMonths = Array.from(new Set([currentMonthKey, ...monthKeysWithData])).sort().reverse();
+  const selectedMonthCount = records.filter((r) => getMonthKey(r.timestamp) === selectedMonth).length;
+
+  const formatMonthLabel = (mk: string) => {
+    const [y, m] = mk.split('-');
+    return `Tháng ${m}/${y}`;
+  };
+
+  const handleBackupMonth = () => {
+    if (selectedMonthCount === 0) return;
+    exportMonthlyCSV(records, selectedMonth);
+    localStorage.setItem('agro_last_backup', new Date().toISOString());
+    setSuccessExport(true);
+    setTimeout(() => setSuccessExport(false), 3500);
   };
 
   const triggerClearAll = () => {
@@ -316,7 +339,7 @@ export default function HistoryTab({
               <input
                 id="search-history"
                 type="text"
-                placeholder="Tìm theo sản phẩm, lượng, số tiền..."
+                placeholder="Tìm theo sản phẩm, khách, lượng, số tiền..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full bg-transparent outline-hidden text-sm text-zinc-900 placeholder-zinc-400 focus:ring-0"
@@ -358,6 +381,46 @@ export default function HistoryTab({
                   </button>
                 );
               })}
+            </div>
+          </div>
+
+          {/* SAO LƯU DỮ LIỆU THEO THÁNG (LƯU VÀO FILES/iCLOUD ĐỂ KHÔNG MẤT) */}
+          <div className="bg-white rounded-2xl p-4 shadow-xs border border-zinc-100 space-y-3">
+            <div className="flex items-center gap-1.5">
+              <CloudUpload className="w-4 h-4 text-[#007AFF]" />
+              <h2 className="text-[#3C3C43] text-xs font-bold uppercase tracking-wider">Sao Lưu Dữ Liệu (Quan Trọng)</h2>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <select
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="flex-1 bg-[#F2F2F7] border border-zinc-200 rounded-xl px-3 py-2 text-xs font-bold text-zinc-800 focus:outline-[#007AFF] cursor-pointer"
+              >
+                {availableMonths.map((mk) => (
+                  <option key={mk} value={mk}>
+                    {formatMonthLabel(mk)} ({records.filter((r) => getMonthKey(r.timestamp) === mk).length} mẻ)
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={handleBackupMonth}
+                disabled={selectedMonthCount === 0}
+                className={`text-xs font-bold px-3 py-2 rounded-xl flex items-center space-x-1 border cursor-pointer active:scale-95 transition-transform shrink-0 ${
+                  selectedMonthCount > 0
+                    ? 'bg-[#007AFF] text-white border-transparent hover:bg-blue-600'
+                    : 'bg-zinc-50 text-zinc-400 border-zinc-200 cursor-not-allowed'
+                }`}
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Sao lưu tháng</span>
+              </button>
+            </div>
+
+            <div className="bg-[#FFF9E6] border border-amber-200 rounded-xl p-3 text-[11px] text-amber-900 leading-relaxed">
+              <p className="font-bold mb-0.5">📌 Cách giữ dữ liệu an toàn (khỏi mất khi reset máy):</p>
+              Ấn <strong>Sao lưu tháng</strong> → khi hiện bảng chia sẻ chọn <strong>"Lưu vào Tệp/Files"</strong> → thư mục <strong>iCloud Drive</strong>. Mỗi tháng nên sao lưu vài lần. Khi cần khôi phục, dùng nút <strong>Nhập File</strong> ở góc trên và chọn lại file CSV đã lưu.
             </div>
           </div>
         </div>
@@ -404,7 +467,7 @@ export default function HistoryTab({
             {successExport && (
               <div className="bg-emerald-600 text-white rounded-xl p-3 text-center text-xs font-bold flex items-center justify-center space-x-2 shadow shadow-emerald-700/20">
                 <Check className="w-4 h-4 animate-ping" />
-                <span>Đã tạo file CSV thành công! Bạn có thể tải lên Google Drive.</span>
+                <span>Đã tạo file CSV thành công! Hãy chọn \"Lưu vào Tệp/Files\" → iCloud Drive để giữ vĩnh viễn.</span>
               </div>
             )}
 
@@ -450,6 +513,12 @@ export default function HistoryTab({
                               <Calendar className="w-3 h-3 mr-0.5" />
                               {formatDateTime(rec.timestamp)}
                             </span>
+                            {rec.customer?.name && (
+                              <span className="text-[10px] text-[#007AFF] font-bold flex items-center mt-0.5">
+                                <User className="w-3 h-3 mr-0.5" />
+                                {rec.customer.name}
+                              </span>
+                            )}
                           </div>
                         </div>
 
@@ -473,7 +542,7 @@ export default function HistoryTab({
                         <div className="mt-4 pt-3.5 border-t border-zinc-100 space-y-3 bg-[#F9F9FB] rounded-xl p-3.5 text-xs leading-relaxed animate-fade-in">
                           
                           {isEditing ? (
-                            /* PANEL CHỈNH SỬA THAM SỐ GIAO DỊCH (EDITING MODE) */
+                            /* PANEL CHỈNH SỬA THAM SỐ GIAO DỊ�CH (EDITING MODE) */
                             <div className="space-y-4 animate-fade-in">
                               <div className="flex justify-between items-center text-xs font-black text-[#007AFF] border-b border-[#007AFF]/20 pb-2">
                                 <span className="flex items-center gap-1">
@@ -516,7 +585,7 @@ export default function HistoryTab({
                                   </div>
                                 </div>
 
-                                {/* 2. NHẬP LẠI GIÁ ĐẦU VÀO / GIÁ SÀN THỎA THUẬN */}
+                                {/* 2. NHẬP LẠI GIÁ ĐẦU VÀO / GIÁ SÀN THỬA THUẬN */}
                                 <div className="space-y-1 bg-white p-2.5 rounded-lg border border-zinc-200">
                                   <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">
                                     💰 Đơn giá sàn gốc (đ/Kg)
@@ -691,6 +760,23 @@ export default function HistoryTab({
                                 <span>Mã mẻ: {rec.id}</span>
                               </div>
 
+                              {rec.customer && (rec.customer.name || rec.customer.cccd || rec.customer.address) && (
+                                <div className="bg-blue-50/60 border border-blue-100 rounded-lg p-2.5 space-y-1 text-[11px] text-zinc-700">
+                                  <p className="font-black text-[#007AFF] flex items-center gap-1 text-[11px] uppercase tracking-wide">
+                                    <User className="w-3 h-3" /> Khách hàng
+                                  </p>
+                                  {rec.customer.name && (
+                                    <div className="flex items-center gap-1"><User className="w-3 h-3 text-zinc-400" /> <strong className="text-zinc-800">{rec.customer.name}</strong></div>
+                                  )}
+                                  {rec.customer.cccd && (
+                                    <div className="flex items-center gap-1"><IdCard className="w-3 h-3 text-zinc-400" /> CCCD: <strong className="text-zinc-800 font-mono">{rec.customer.cccd}</strong></div>
+                                  )}
+                                  {rec.customer.address && (
+                                    <div className="flex items-start gap-1"><MapPin className="w-3 h-3 text-zinc-400 mt-0.5" /> <span className="text-zinc-700">{rec.customer.address}</span></div>
+                                  )}
+                                </div>
+                              )}
+
                               <div className="space-y-2">
                                 {/* Biểu mẫu tóm tắt các yếu tố chất lượng đầu vào */}
                                 <div className="grid grid-cols-2 gap-2 text-zinc-650 bg-white p-2.5 rounded-lg border border-zinc-150">
@@ -729,7 +815,7 @@ export default function HistoryTab({
                                 </div>
                               </div>
 
-                              {/* Cụm hành động: CHỈNH SỬA / XÓA BẢN GHI RIÊNG LẺ */}
+                              {/* Cụm hành động: CHỈNH SỬA / XÓA BẢN GHI RIÊNG LẼ */}
                               <div className="flex justify-between items-center pt-3 border-t border-zinc-200/65">
                                 <button
                                   type="button"
